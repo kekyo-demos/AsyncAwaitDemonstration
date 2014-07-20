@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -69,8 +70,49 @@ namespace AsyncAwaitDemonstration
 			}
 		}
 
+#if !WPFBUG
+		private static Task DependencyObjectTaskRun(Action action)
+		{
+			// BUG: Resource leaked by worker thread using DependencyObject.
+			//  http://grabacr.net/archives/1851
+
+			var tcs = new TaskCompletionSource<object>();
+
+			var thread = new Thread(() =>
+			{
+				try
+				{
+					action();
+
+					tcs.SetResult(null);
+				}
+				catch (Exception ex)
+				{
+					tcs.SetException(ex);
+				}
+
+				System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvokeShutdown(System.Windows.Threading.DispatcherPriority.SystemIdle);
+				System.Windows.Threading.Dispatcher.Run();
+			});
+
+			thread.SetApartmentState(ApartmentState.STA);
+			thread.Start();
+
+			return tcs.Task;
+		}
+#endif
+
 		private Task ExtractAndShowImagesAsync(Stream stream)
 		{
+#if !WPFBUG
+			return DependencyObjectTaskRun(() =>
+				{
+					foreach (var image in this.ExtractImages(stream))
+					{
+						this.Dispatcher.BeginInvoke(new Action(() => this.ClaudiaImages.Add(image)));
+					}
+				});
+#else
 			// BUG: Resource leaked by worker thread using DependencyObject.
 			//  http://grabacr.net/archives/1851
 			return Task.Run(() =>
@@ -80,6 +122,7 @@ namespace AsyncAwaitDemonstration
 						this.Dispatcher.BeginInvoke(new Action(() => this.ClaudiaImages.Add(image)));
 					}
 				});
+#endif
 		}
 
 #if !NET40
@@ -90,7 +133,7 @@ namespace AsyncAwaitDemonstration
 				using (var stream = await httpClient.GetStreamAsync(
 					"http://download.microsoft.com/download/B/B/1/BB1F3160-9806-4021-97CC-CCBAC25EB5D4/Claudia_data1.zip"))
 				{
-					this.ExtractAndShowImages(stream);
+					await this.ExtractAndShowImagesAsync(stream);
 				}
 			}
 		}
