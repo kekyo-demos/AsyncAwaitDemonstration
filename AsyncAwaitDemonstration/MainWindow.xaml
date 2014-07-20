@@ -1,0 +1,44 @@
+﻿<Window
+	x:Class="AsyncAwaitDemonstration.MainWindow"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:i="http://schemas.microsoft.com/expression/2010/interactivity"
+	xmlns:ewb="clr-namespace:Extensions.Wpf.Behaviors;assembly=Extensions.Wpf"
+	Title="Claudia-Tan come here!!"
+	Height="350"
+	Width="525">
+	<DockPanel>
+		<Button
+			x:Name="button"
+			DockPanel.Dock="Top"
+			Content="Claudia-Tan come here!!"
+			Click="Button_Click" />
+		<ListBox
+			ScrollViewer.CanContentScroll="False"
+			ScrollViewer.VerticalScrollBarVisibility="Disabled"
+			ItemsSource="{Binding ClaudiaImages}">
+			<i:Interaction.Behaviors>
+				<ewb:ListBoxScrollDownBehavior />
+			</i:Interaction.Behaviors>
+			<ListBox.ItemsPanel>
+				<ItemsPanelTemplate>
+					<VirtualizingStackPanel
+						Orientation="Horizontal" />
+				</ItemsPanelTemplate>
+			</ListBox.ItemsPanel>
+			<ListBox.ItemTemplate>
+				<DataTemplate>
+					<DockPanel>
+						<TextBlock
+							DockPanel.Dock="Top"
+							Text="{Binding Title}" />
+						<Image
+							Height="{Binding RelativeSource={RelativeSource AncestorType={x:Type ListBox}}, Path=ActualHeight}"
+							RenderOptions.BitmapScalingMode="HighQuality"
+							Source="{Binding Image}" />
+					</DockPanel>
+				</DataTemplate>
+			</ListBox.ItemTemplate>
+		</ListBox>
+	</DockPanel>
+</Window>
