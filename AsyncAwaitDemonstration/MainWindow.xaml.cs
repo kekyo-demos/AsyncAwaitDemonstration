@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Reactive;
+using System.Reactive.Concurrency;
+using System.Reactive.Linq;
 
 namespace AsyncAwaitDemonstration
 {
@@ -17,6 +20,8 @@ namespace AsyncAwaitDemonstration
 	/// </summary>
 	public partial class MainWindow : Window
 	{
+		private readonly Nito.AsyncEx.AsyncLock lock_ = new Nito.AsyncEx.AsyncLock();
+
 		public MainWindow()
 		{
 			this.ClaudiaImages = new ObservableCollection<ClaudiaImage>();
@@ -70,7 +75,7 @@ namespace AsyncAwaitDemonstration
 			}
 		}
 
-#if !WPFBUG
+#if WPFBUG
 		private static Task DependencyObjectTaskRun(Action action)
 		{
 			// BUG: Resource leaked by worker thread using DependencyObject.
@@ -104,7 +109,12 @@ namespace AsyncAwaitDemonstration
 
 		private Task ExtractAndShowImagesAsync(Stream stream)
 		{
-#if !WPFBUG
+#if REACTIVE
+			return this.ExtractImages(stream).
+				ToObservable(ThreadPoolScheduler.Instance).
+				ObserveOn(new SynchronizationContextScheduler(SynchronizationContext.Current)).
+				ForEachAsync(image => this.ClaudiaImages.Add(image));
+#elif WPFBUG
 			return DependencyObjectTaskRun(() =>
 				{
 					foreach (var image in this.ExtractImages(stream))
@@ -125,42 +135,44 @@ namespace AsyncAwaitDemonstration
 #endif
 		}
 
-#if !NET40
+#if NET45
 		private async void Button_Click(object sender, RoutedEventArgs e)
 		{
-			using (var httpClient = new HttpClient())
+			using (var l = await lock_.LockAsync())
 			{
-				using (var stream = await httpClient.GetStreamAsync(
-					"http://download.microsoft.com/download/B/B/1/BB1F3160-9806-4021-97CC-CCBAC25EB5D4/Claudia_data1.zip"))
+				using (var httpClient = new HttpClient())
 				{
-					await this.ExtractAndShowImagesAsync(stream);
+					using (var stream = await httpClient.GetStreamAsync(
+						"http://download.microsoft.com/download/B/B/1/BB1F3160-9806-4021-97CC-CCBAC25EB5D4/Claudia_data1.zip"))
+					{
+						await this.ExtractAndShowImagesAsync(stream);
+					}
 				}
 			}
 		}
 #else
 		private void Button_Click(object sender, RoutedEventArgs e)
 		{
-			var httpClient = new HttpClient();
-
-			httpClient.GetStreamAsync(
-				"http://download.microsoft.com/download/B/B/1/BB1F3160-9806-4021-97CC-CCBAC25EB5D4/Claudia_data1.zip").
-				ContinueWith(task1 =>
-				{
-					this.Dispatcher.BeginInvoke(new Action(() =>
-						{
-							try
+			lock_.LockAsync().
+				ContinueWith(task0 =>
+					{
+						var httpClient = new HttpClient();
+						httpClient.GetStreamAsync(
+							"http://download.microsoft.com/download/B/B/1/BB1F3160-9806-4021-97CC-CCBAC25EB5D4/Claudia_data1.zip").
+							ContinueWith(task1 =>
 							{
-								using (var stream = task1.Result)
+								this.Dispatcher.BeginInvoke(new Action(() =>
 								{
-									this.ExtractAndShowImages(stream);
-								}
-							}
-							finally
-							{
-								httpClient.Dispose();
-							}
-						}));
-				});
+									this.ExtractAndShowImagesAsync(task1.Result).
+										ContinueWith(task2 =>
+										{
+											task1.Result.Dispose();
+											httpClient.Dispose();
+											task0.Result.Dispose();
+										});
+								}));
+							});
+					});
 		}
 #endif
 
