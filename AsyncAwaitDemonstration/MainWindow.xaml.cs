@@ -112,7 +112,7 @@ namespace AsyncAwaitDemonstration
 #if REACTIVE
 			return this.ExtractImages(stream).
 				ToObservable(ThreadPoolScheduler.Instance).
-				ObserveOn(new SynchronizationContextScheduler(SynchronizationContext.Current)).
+				ObserveOnDispatcher().
 				ForEachAsync(image => this.ClaudiaImages.Add(image));
 #elif WPFBUG
 			return DependencyObjectTaskRun(() =>
