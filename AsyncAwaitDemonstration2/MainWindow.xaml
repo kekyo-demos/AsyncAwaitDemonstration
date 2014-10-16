@@ -1,0 +1,20 @@
+﻿<Window x:Class="AsyncAwaitDemonstration2.MainWindow"
+		xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		Title="MainWindow" Height="350" Width="525">
+	<DockPanel>
+		<Button DockPanel.Dock="Top" Content="Start" Click="Button_Click" />
+		<ListBox
+			ScrollViewer.CanContentScroll="False"
+			ItemsSource="{Binding Images}">
+			<ListBox.ItemTemplate>
+				<DataTemplate>
+					<Image
+						Width="800"
+						RenderOptions.BitmapScalingMode="HighQuality"
+						Source="{Binding}" />
+				</DataTemplate>
+			</ListBox.ItemTemplate>
+		</ListBox>
+	</DockPanel>
+</Window>
